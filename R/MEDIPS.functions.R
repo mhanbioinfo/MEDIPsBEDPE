@@ -27,7 +27,7 @@ matDiff<-function(x,groups,dimension=c("row"=1,"col"=2)[1]){
 	ugr <- sort(unique(groups))
 	f0 <- groups==ugr[1] & !is.na(groups)
 	f1 <- groups==ugr[2] & !is.na(groups)
-	if(dimension==1){	
+	if(dimension==1){
 	  res<-x[,f0,drop=FALSE]-x[,f1,drop=FALSE]
 	}else{
 	  res<-x[f0,,drop=FALSE]-x[f1,,drop=FALSE]
@@ -102,10 +102,10 @@ matTtest <- function(x,groups,dimension=c("row"=1,"col"=2)[1],alternative = c("t
 		tstat <- (apply(x[,f0],dimension,mean)-apply(x[,f1],dimension,mean)) / sqrt( sd0^2/na0 + sd1^2/na1)
 		df <- na0 + na1 -2
 		if(any(sd0 != sd1)){
-			fi     <- sd0 != sd1 			
+			fi     <- sd0 != sd1
 			err0   <- sd0[fi]/sqrt(na0[fi])
-			err1   <- sd1[fi]/sqrt(na1[fi])		
-			df[fi] <- (err0^2+err1^2)^2/(err0^4/(na0-1) + err1^4/(na1-1))		
+			err1   <- sd1[fi]/sqrt(na1[fi])
+			df[fi] <- (err0^2+err1^2)^2/(err0^4/(na0-1) + err1^4/(na1-1))
 		}
 	}
 	if (alternative == "less") {
@@ -118,7 +118,4 @@ matTtest <- function(x,groups,dimension=c("row"=1,"col"=2)[1],alternative = c("t
 		pval  <- 2 * pt(-abs(tstat), df)
 	}
 	return(data.frame(p.value=pval,df=df, t.statistics=tstat))
-################da die ganzen werte eh nicht ausgewertet werden, könnte man auch statdessen nur pval zurückgeben
-	#return(pval)
-
 }

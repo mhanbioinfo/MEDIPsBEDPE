@@ -8,84 +8,96 @@
 ##Modified:	22/4/2015
 ##Author:	Lukas Chavez, Matthias Lienhard, Isaac Lopez Moyado
 
+## edited by: Ming Han (2022_07_22)
+## saves 'GRanges.Reads' to global env so MEDIPS QC functions can use it
+## and don't have to run getGRange() or getPairedGRange() again
+
 MEDIPS.createSet <-
-function (file = NULL, extend = 0, shift = 0, window_size = 300, 
-    BSgenome = NULL, uniq = 1e-3, chr.select = NULL, paired = F, 
-    sample_name = NULL, isSecondaryAlignment = FALSE, simpleCigar=TRUE) 
-{
+  function (file = NULL, extend = 0, shift = 0, window_size = 300,
+            BSgenome = NULL, uniq = 1e-3, chr.select = NULL, paired = F,
+            sample_name = NULL, isSecondaryAlignment = FALSE, simpleCigar=TRUE)
+  {
     if (is.null(BSgenome)) {
-        stop("Must specify a BSgenome library.")
+      stop("Must specify a BSgenome library.")
     }
     if (is.null(file)) {
-        stop("Must specify a bam or txt file.")
+      stop("Must specify a bam or txt file.")
     }
-    fileName = unlist(strsplit(file, "/"))[length(unlist(strsplit(file, 
-        "/")))]
-    path = paste(unlist(strsplit(file, "/"))[1:(length(unlist(strsplit(file, 
-        "/")))) - 1], collapse = "/")
+    fileName = unlist(strsplit(file, "/"))[length(unlist(strsplit(file,
+                                                                  "/")))]
+    path = paste(unlist(strsplit(file, "/"))[1:(length(unlist(strsplit(file,
+                                                                       "/")))) - 1], collapse = "/")
     if (path == "") {
-        path = getwd()
+      path = getwd()
     }
     dataset = getBSgenome(BSgenome)
     if (is.null(chr.select)) {
-        cat("All chromosomes in the reference BSgenome will be processed:\n")
-        chr.select = seqnames(dataset)
-        print(chr.select)
+      cat("All chromosomes in the reference BSgenome will be processed:\n")
+      chr.select = seqnames(dataset)
+      print(chr.select)
     }
     else {
-        if (sum(!chr.select %in% seqnames(dataset)) != 0) {
-            cat("The requested chromosome(s)", chr.select[!chr.select %in% 
-                seqnames(dataset)], "are not available in the BSgenome reference. Chromosomes available in the BSgenome reference:", 
-                seqnames(dataset), "\n")
-            stop("Please check chromosome names.")
-        }
+      if (sum(!chr.select %in% seqnames(dataset)) != 0) {
+        cat("The requested chromosome(s)", chr.select[!chr.select %in%
+                                                        seqnames(dataset)], "are not available in the BSgenome reference. Chromosomes available in the BSgenome reference:",
+            seqnames(dataset), "\n")
+        stop("Please check chromosome names.")
+      }
     }
     if (length(chr.select) > 1) {
-        chr.select = mixedsort(unique(chr.select))
+      chr.select = mixedsort(unique(chr.select))
     }
     if (!fileName %in% dir(path)) {
-        stop(paste("File", fileName, " not found in", path, sep = " "))
+      stop(paste("File", fileName, " not found in", path, sep = " "))
     }
     ext = strsplit(fileName, ".", fixed = T)[[1]]
-    if (ext[length(ext)] %in% c("gz", "zip", "bz2")) 
-        ext = ext[-length(ext)]
+    if (ext[length(ext)] %in% c("gz", "zip", "bz2"))
+      ext = ext[-length(ext)]
     if (ext[length(ext)] %in% c("wig", "bw", "bigwig")) {
-        MEDIPSsetObj = getMObjectFromWIG(fileName, path, chr.select, 
-            BSgenome)
+      MEDIPSsetObj = getMObjectFromWIG(fileName, path, chr.select,
+                                       BSgenome)
     }
     else {
-        if (!paired) {
-            GRange.Reads = getGRange(fileName, path, extend, 
-                shift, chr.select, dataset, uniq, isSecondaryAlignment = isSecondaryAlignment, simpleCigar=simpleCigar)
-        }
-        else {
-            GRange.Reads = getPairedGRange(fileName, path, extend, 
-                shift, chr.select, dataset, uniq, isSecondaryAlignment = isSecondaryAlignment, simpleCigar=simpleCigar)
-        }
-        chr_lengths = as.numeric(seqlengths(dataset)[chr.select])
-        no_chr_windows = ceiling(chr_lengths/window_size)
-        supersize_chr = cumsum(no_chr_windows)
-        Granges.genomeVec = MEDIPS.GenomicCoordinates(supersize_chr, 
-            no_chr_windows, chr.select, chr_lengths, window_size)
-        
-        cat("Calculating short read coverage at genome wide windows...\n")
-        overlap = countOverlaps(Granges.genomeVec, GRange.Reads)
-        datachr = unique(seqlevels(GRange.Reads))
-       
-        if (sum(!chr.select %in% datachr) != 0) {
-            cat("Please note, no data in the alignment file for chromosome(s):", 
-                chr.select[!chr.select %in% datachr], "\n")
-        }
-       
-        if (is.null(sample_name)) {
-            sample_name = fileName
-        }
+      if (!paired) {
+        GRange.Reads = getGRange(fileName, path, extend, shift, chr.select, dataset, uniq,
+                                 isSecondaryAlignment = isSecondaryAlignment, simpleCigar=simpleCigar)
+        ## saves 'GRanges.Reads' to global env
+        ## so MEDIPS QC functions can use it
+        ## and don't have to run getGRange() again
+        assign("GRangeObj", GRange.Reads, envir = .GlobalEnv)
+      }
+      else {
+        GRange.Reads = getPairedGRange(fileName, path, extend, shift, chr.select, dataset, uniq,
+                                       isSecondaryAlignment = isSecondaryAlignment, simpleCigar=simpleCigar)
+        ## saves 'GRanges.Reads' to global env
+        ## so MEDIPS QC functions can use it
+        ## and don't have to run getPairedGRange() again
+        assign("GRangeObj", GRange.Reads, envir = .GlobalEnv)
+      }
+      chr_lengths = as.numeric(seqlengths(dataset)[chr.select])
+      no_chr_windows = ceiling(chr_lengths/window_size)
+      supersize_chr = cumsum(no_chr_windows)
+      Granges.genomeVec = MEDIPS.GenomicCoordinates(supersize_chr,
+                                                    no_chr_windows, chr.select, chr_lengths, window_size)
 
-        MEDIPSsetObj = new("MEDIPSset", sample_name = sample_name, 
-            path_name = path, genome_name = BSgenome, number_regions = length(GRange.Reads), 
-            chr_names = chr.select, chr_lengths = chr_lengths, 
-            genome_count = overlap, extend = extend, shifted = shift, 
-            window_size = window_size, uniq = uniq)
+      cat("Calculating short read coverage at genome wide windows...\n")
+      overlap = countOverlaps(Granges.genomeVec, GRange.Reads)
+      datachr = unique(seqlevels(GRange.Reads))
+
+      if (sum(!chr.select %in% datachr) != 0) {
+        cat("Please note, no data in the alignment file for chromosome(s):",
+            chr.select[!chr.select %in% datachr], "\n")
+      }
+
+      if (is.null(sample_name)) {
+        sample_name = fileName
+      }
+
+      MEDIPSsetObj = new("MEDIPSset", sample_name = sample_name,
+                         path_name = path, genome_name = BSgenome, number_regions = length(GRange.Reads),
+                         chr_names = chr.select, chr_lengths = chr_lengths,
+                         genome_count = overlap, extend = extend, shifted = shift,
+                         window_size = window_size, uniq = uniq)
     }
     return(MEDIPSsetObj)
-}
+  }
